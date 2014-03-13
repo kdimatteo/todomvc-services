@@ -1,4 +1,4 @@
-Python basedREST API for TodoMVC
+Python based REST API for TodoMVC
 ================================
 Most basic functioality possible, useful for testing online/offline synchronization.
 
