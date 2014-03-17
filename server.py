@@ -6,6 +6,8 @@ import os
 from functools import wraps
 import sqlite3
 
+#TODO http://blog.miguelgrinberg.com/post/designing-a-restful-api-using-flask-restful
+#TODO clean up imports, modularize
 
 app = flask.Flask(__name__)
 DATABASE = 'todo.db'
@@ -37,11 +39,14 @@ def crossdomain(origin=None, methods=None, headers=None,
 
     def decorator(f):
         def wrapped_function(*args, **kwargs):
-            if automatic_options and request.method == 'OPTIONS':
+            
+            if automatic_options and (request.method == 'OPTIONS'): # or request.method == 'DELETE'):
                 resp = current_app.make_default_options_response()
+            
             else:
                 resp = make_response(f(*args, **kwargs))
-            if not attach_to_all and request.method != 'OPTIONS':
+
+            if not attach_to_all and request.method != 'OPTIONS': # and request.method != 'DELETE':
                 return resp
 
             h = resp.headers
@@ -55,6 +60,7 @@ def crossdomain(origin=None, methods=None, headers=None,
 
         f.provide_automatic_options = False
         return update_wrapper(wrapped_function, f)
+
     return decorator
 
 
@@ -92,33 +98,39 @@ def before_request():
 def after_request(response):
     g.db.close()
     h = response.headers
-
     # Allow crossdomain for other HTTP Verbs
     if request.method != 'OPTIONS' and 'Origin' in request.headers:
         h['Access-Control-Allow-Origin'] = request.headers['Origin']
-
     return response
 
 
 @app.route("/api/todos", methods=['GET'])
+@crossdomain(origin='*')
 def getData():
-    cur = g.db.execute('''SELECT title, is_completed FROM todos''')
+    cur = g.db.execute('''SELECT id, title, is_completed FROM todos''')
     rv = [dict((cur.description[idx][0], value)
                 for idx, value in enumerate(row)) for row in cur.fetchall()]
     return json.dumps(rv)
 
+
 @app.route("/api/todos", methods=['POST', 'OPTIONS'])
 @crossdomain(origin='*')
 def postData():
-    
-    o = flask.request.data #.form['title']
     c = g.db.execute("INSERT INTO todos ('is_completed', 'title') VALUES (?, ?)", (flask.request.json['isCompleted'], flask.request.json['title']))
     g.db.commit()
-    
     # insert the new ID and return the data
     flask.request.json['id'] = c.lastrowid
     return json.dumps(flask.request.json)
-    
+
+
+@app.route("/api/todos/<id>", methods=['DELETE'])
+@crossdomain(origin='*')
+def deleteData(id):
+    app.logger.debug(id)
+    c = g.db.execute("DELETE FROM todos WHERE id = ?", id)
+    return json.dumps( { 'result': True } )
+
+
 if __name__ == "__main__":
 	# Bind to PORT if defined, otherwise default to 5000.
 	port = int(os.environ.get('PORT', 5000))
