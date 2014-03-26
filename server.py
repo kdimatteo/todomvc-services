@@ -33,7 +33,6 @@ def crossdomain(origin=None, methods=None, headers=None,
     def get_methods():
         if methods is not None:
             return methods
-
         options_resp = current_app.make_default_options_response()
         return options_resp.headers['allow']
 
@@ -60,10 +59,7 @@ def crossdomain(origin=None, methods=None, headers=None,
 
         f.provide_automatic_options = False
         return update_wrapper(wrapped_function, f)
-
     return decorator
-
-
 
 def connect_db():
     return sqlite3.connect(DATABASE)
@@ -90,9 +86,7 @@ def before_request():
         # We also keep current headers
         if headers is not None:
             h['Access-Control-Allow-Headers'] = headers
-
         return resp
-
 
 @app.after_request
 def after_request(response):
@@ -103,11 +97,16 @@ def after_request(response):
         h['Access-Control-Allow-Origin'] = request.headers['Origin']
     return response
 
+'''
+REST methods
+------------------------------------------------------------
+'''
 
 @app.route("/api/todos", methods=['GET'])
 @crossdomain(origin='*')
 def getData():
-    cur = g.db.execute('''SELECT id, title, is_completed FROM todos''')
+    #cur = g.db.execute("SELECT id, title, (CASE WHEN is_completed = 1 THEN 'true' ELSE 'false' END) AS is_completed FROM todos")
+    cur = g.db.execute("SELECT id, title, is_completed FROM todos")
     rv = [dict((cur.description[idx][0], value)
                 for idx, value in enumerate(row)) for row in cur.fetchall()]
     return json.dumps(rv)
@@ -128,8 +127,28 @@ def postData():
 def deleteData(id):
     app.logger.debug(id)
     c = g.db.execute("DELETE FROM todos WHERE id = ?", id)
-    return json.dumps( { 'result': True } )
+    g.db.commit()
+    return json.dumps(flask.request.json)
 
+
+@app.route("/api/todos/<id>", methods=['PUT'])
+@crossdomain(origin='*')
+def updateData(id):
+    app.logger.debug(id)
+    c = g.db.execute("UPDATE todos SET 'is_completed' = ?, 'title' = ? WHERE id = ?", (flask.request.json['isCompleted'], flask.request.json['title'], id))
+    g.db.commit()
+    #return json.dumps(flask.request.json)
+    return ""
+
+'''
+@app.route("/api/todos/<id>", methods=['PATCH'])
+@crossdomain(origin='*')
+def updateData(id):
+    app.logger.debug(id)
+    c = g.db.execute("UPDATE todos SET 'is_completed' = ?, 'title' = ? WHERE id = ?", (flask.request.json['isCompleted'], flask.request.json['title'], id))
+    g.db.commit()
+    return json.dumps(flask.request.json)
+'''
 
 if __name__ == "__main__":
 	# Bind to PORT if defined, otherwise default to 5000.
